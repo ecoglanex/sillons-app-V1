@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Suivi Demandes Sillons</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="local-demo.js"></script>
+  <style>
+    :root {
+      --rail:#1a1a2e;--rail-mid:#16213e;--accent:#e94560;--accent2:#f5a623;
+      --text:#eaeaea;--text-muted:#8a8fa8;--surface:rgba(255,255,255,0.04);
+      --border:rgba(255,255,255,0.08);--radius:12px;
+    }
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{background:var(--rail);color:var(--text);font-family:'Syne',sans-serif;min-height:100vh;display:flex;overflow:hidden;}
+    .left-panel{width:55%;position:relative;display:flex;flex-direction:column;justify-content:space-between;padding:48px;background:var(--rail-mid);overflow:hidden;}
+    .rail-bg{position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0px,transparent 58px,rgba(255,255,255,0.015) 58px,rgba(255,255,255,0.015) 60px);}
+    .rail-lines{position:absolute;bottom:0;left:0;right:0;height:260px;}
+    .rail-lines svg{width:100%;height:100%;}
+    .brand{position:relative;z-index:2;}
+    .brand-badge{display:inline-flex;align-items:center;gap:8px;background:var(--accent);color:#fff;font-family:'DM Mono',monospace;font-size:11px;letter-spacing:2px;padding:6px 14px;border-radius:4px;text-transform:uppercase;margin-bottom:28px;}
+    .brand-badge span{width:6px;height:6px;background:#fff;border-radius:50%;animation:pulse 1.8s ease-in-out infinite;}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+    .brand h1{font-size:clamp(32px,3.5vw,48px);font-weight:800;line-height:1.1;letter-spacing:-1px;}
+    .brand h1 em{color:var(--accent);font-style:normal;}
+    .brand p{margin-top:16px;font-size:15px;color:var(--text-muted);max-width:360px;line-height:1.7;}
+    .stats{position:relative;z-index:2;display:flex;gap:32px;}
+    .stat{border-left:2px solid var(--accent);padding-left:14px;}
+    .stat strong{display:block;font-size:22px;font-weight:700;}
+    .stat span{font-size:11px;color:var(--text-muted);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:1px;}
+    .right-panel{width:45%;display:flex;align-items:center;justify-content:center;padding:48px 40px;}
+    .auth-box{width:100%;max-width:400px;}
+    .tabs{display:flex;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:4px;margin-bottom:32px;}
+    .tab-btn{flex:1;padding:10px;background:none;border:none;color:var(--text-muted);font-family:'Syne',sans-serif;font-size:14px;font-weight:600;cursor:pointer;border-radius:8px;transition:all .2s;}
+    .tab-btn.active{background:var(--accent);color:#fff;}
+    .form-panel{display:none;}
+    .form-panel.active{display:block;animation:fadeIn .25s ease;}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+    .form-title{font-size:22px;font-weight:700;margin-bottom:6px;}
+    .form-subtitle{font-size:13px;color:var(--text-muted);margin-bottom:28px;line-height:1.6;}
+    .field{margin-bottom:16px;}
+    .field label{display:block;font-size:12px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);margin-bottom:7px;font-family:'DM Mono',monospace;}
+    .field input{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 14px;color:var(--text);font-family:'Syne',sans-serif;font-size:14px;outline:none;transition:border-color .2s,background .2s;}
+    .field input:focus{border-color:var(--accent);background:rgba(233,69,96,0.06);}
+    .field input::placeholder{color:var(--text-muted);}
+    .field-row{display:flex;gap:12px;}
+    .field-row .field{flex:1;}
+    .btn-primary{width:100%;padding:14px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-family:'Syne',sans-serif;font-size:15px;font-weight:700;cursor:pointer;transition:transform .15s,box-shadow .15s,opacity .2s;margin-top:8px;letter-spacing:.5px;}
+    .btn-primary:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 20px rgba(233,69,96,0.35);}
+    .btn-primary:disabled{opacity:.6;cursor:not-allowed;}
+    .divider{display:flex;align-items:center;gap:12px;margin:22px 0;color:var(--text-muted);font-size:12px;}
+    .divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border);}
+    .info-box{background:rgba(245,166,35,0.08);border:1px solid rgba(245,166,35,0.2);border-radius:8px;padding:12px 14px;font-size:12.5px;color:var(--accent2);line-height:1.6;margin-top:20px;}
+    .info-box strong{display:block;margin-bottom:3px;}
+    .error-msg{background:rgba(233,69,96,0.1);border:1px solid rgba(233,69,96,0.25);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--accent);margin-bottom:16px;display:none;}
+    .success-msg{display:none;text-align:center;padding:32px 20px;animation:fadeIn .3s ease;}
+    .success-msg .icon{font-size:48px;margin-bottom:16px;display:block;}
+    .success-msg h3{font-size:20px;margin-bottom:8px;}
+    .success-msg p{color:var(--text-muted);font-size:14px;line-height:1.6;}
+    .spinner{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:8px;}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    @media(max-width:768px){body{flex-direction:column;overflow:auto;}.left-panel{width:100%;padding:32px 24px 40px;min-height:240px;}.right-panel{width:100%;padding:32px 20px 48px;}.rail-lines{height:120px;}}
+  </style>
+</head>
+<body>
+
+<div class="left-panel">
+  <div class="rail-bg"></div>
+  <svg class="rail-lines" viewBox="0 0 700 260" preserveAspectRatio="none">
+    <path d="M-20 240 Q200 180 400 160 Q600 140 720 80" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="3"/>
+    <path d="M-20 260 Q200 200 400 180 Q600 160 720 100" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="3"/>
+    <line x1="80" y1="232" x2="92" y2="228" stroke="rgba(255,255,255,0.08)" stroke-width="8"/>
+    <line x1="200" y1="205" x2="216" y2="200" stroke="rgba(255,255,255,0.08)" stroke-width="8"/>
+    <line x1="320" y1="184" x2="340" y2="179" stroke="rgba(255,255,255,0.08)" stroke-width="8"/>
+    <line x1="440" y1="163" x2="464" y2="157" stroke="rgba(255,255,255,0.08)" stroke-width="8"/>
+    <line x1="560" y1="136" x2="588" y2="130" stroke="rgba(255,255,255,0.08)" stroke-width="8"/>
+    <path d="M-20 250 Q200 190 400 170 Q600 150 720 90" fill="none" stroke="rgba(233,69,96,0.3)" stroke-width="1.5" stroke-dasharray="12 6"/>
+  </svg>
+  <div class="brand">
+    <div class="brand-badge"><span></span>Système actif</div>
+    <h1>Demandes<br/><em>Sillons</em><br/>Ferroviaires</h1>
+    <p>Plateforme sécurisée de gestion et de suivi des demandes de sillons en temps réel.</p>
+  </div>
+  <div class="stats">
+    <div class="stat"><strong>SNCF</strong><span>Réseau</span></div>
+    <div class="stat"><strong>100%</strong><span>Sécurisé</span></div>
+    <div class="stat"><strong>24/7</strong><span>Disponible</span></div>
+  </div>
+</div>
+
+<div class="right-panel">
+  <div class="auth-box">
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('login')">Connexion</button>
+      <button class="tab-btn" onclick="switchTab('register')">Inscription</button>
+    </div>
+
+    <!-- CONNEXION -->
+    <div class="form-panel active" id="panel-login">
+      <div class="form-title">Bon retour 👋</div>
+      <div class="form-subtitle">Connectez-vous avec vos identifiants.</div>
+      <div class="error-msg" id="login-error"></div>
+      <div class="field"><label>Email</label><input type="email" id="login-email" placeholder="prenom.nom@exemple.fr"/></div>
+      <div class="field"><label>Mot de passe</label><input type="password" id="login-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')handleLogin()"/></div>
+      <button class="btn-primary" id="btn-login" onclick="handleLogin()">Se connecter →</button>
+      <div class="divider">ou</div>
+      <div style="text-align:center;font-size:13px;color:var(--text-muted)">
+        Pas encore de compte ? <a href="#" onclick="switchTab('register')" style="color:var(--accent);text-decoration:none;font-weight:600">S'inscrire</a>
+      </div>
+    </div>
+
+    <!-- INSCRIPTION -->
+    <div class="form-panel" id="panel-register">
+      <div class="form-title">Nouvelle demande</div>
+      <div class="form-subtitle">Votre compte sera activé après validation par l'administrateur.</div>
+      <div class="error-msg" id="register-error"></div>
+      <div class="field-row">
+        <div class="field"><label>Prénom</label><input type="text" id="reg-prenom" placeholder="Jean"/></div>
+        <div class="field"><label>Nom</label><input type="text" id="reg-nom" placeholder="Dupont"/></div>
+      </div>
+      <div class="field"><label>Email professionnel</label><input type="email" id="reg-email" placeholder="prenom.nom@exemple.fr"/></div>
+      <div class="field"><label>Téléphone</label><input type="tel" id="reg-tel" placeholder="06 XX XX XX XX"/></div>
+      <div class="field"><label>Secteur / Entreprise</label><input type="text" id="reg-entreprise" placeholder="Ex : SNCF Réseau, GTI..."/></div>
+      <div class="field"><label>Mot de passe</label><input type="password" id="reg-password" placeholder="8 caractères minimum"/></div>
+      <button class="btn-primary" id="btn-register" onclick="handleRegister()">Envoyer la demande →</button>
+      <div class="info-box">
+        <strong>⏱ Délai de validation</strong>
+        Vous recevrez un email dès que votre compte sera activé par l'administrateur.
+      </div>
+    </div>
+
+    <!-- SUCCÈS -->
+    <div class="success-msg" id="success-register">
+      <span class="icon">✅</span>
+      <h3>Demande envoyée !</h3>
+      <p>Votre inscription a été transmise à l'administrateur.<br/>Vous recevrez un email dès activation.</p>
+    <div class="info-box"><strong>Mode démo local</strong>Si tu ouvres ce projet en local, un mode test sans backend s'active automatiquement. Comptes de test : <code>demo@sillons.local / Demo1234!</code> et admin <code>james.gigot@reseau.sncf.fr / Admin123!</code>.</div>
+</div>
+  </div>
+</div>
+
+<script>
+  // ══════════════════════════════════════
+  //  ⚙️  REMPLACE CES 2 VALEURS
+  //      Supabase > Settings > API
+  // ══════════════════════════════════════
+  const SUPABASE_URL      = 'https://ytcubodufgwqjiblkigi.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl0Y3Vib2R1Zmd3cWppYmxraWdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNDA4MzcsImV4cCI6MjA5MTkxNjgzN30.EPaQ7Z6K8G9UJ4k5q69pAWZ_x5ZNVjGh9c-5rJk4is4
+
+';
+  const ADMIN_EMAIL       = 'james.gigot@reseau.sncf.fr';
+
+  const { createClient } = supabase;
+  const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // Rediriger si déjà connecté
+  (async () => {
+    const { data:{ session } } = await db.auth.getSession();
+    if (session) redirect(session.user.email);
+  })();
+
+  function redirect(email) {
+    window.location.href = email === ADMIN_EMAIL ? 'pages/admin.html' : 'pages/formulaire.html';
+  }
+
+  function switchTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach((b,i) =>
+      b.classList.toggle('active',(tab==='login'&&i===0)||(tab==='register'&&i===1)));
+    document.getElementById('panel-login').classList.toggle('active', tab==='login');
+    document.getElementById('panel-register').classList.toggle('active', tab==='register');
+    document.getElementById('success-register').style.display = 'none';
+    hideErr('login-error'); hideErr('register-error');
+  }
+  function setLoading(id, on, lbl) {
+    const b = document.getElementById(id);
+    b.disabled = on;
+    b.innerHTML = on ? '<span class="spinner"></span>Chargement...' : lbl;
+  }
+  function showErr(id, msg) { const e=document.getElementById(id); e.textContent=msg; e.style.display='block'; }
+  function hideErr(id) { document.getElementById(id).style.display='none'; }
+
+  // ══ CONNEXION ══
+  async function handleLogin() {
+    hideErr('login-error');
+    const email = document.getElementById('login-email').value.trim();
+    const pwd   = document.getElementById('login-password').value;
+    if (!email||!pwd) { showErr('login-error','Veuillez remplir tous les champs.'); return; }
+
+    setLoading('btn-login', true, 'Se connecter →');
+    const { data, error } = await db.auth.signInWithPassword({ email, password: pwd });
+    setLoading('btn-login', false, 'Se connecter →');
+
+    if (error) {
+      showErr('login-error', '⚠️ ' + (error.message.includes('Invalid') ? 'Email ou mot de passe incorrect.' : error.message));
+      return;
+    }
+
+    // Vérifier statut (sauf admin)
+    if (data.user.email !== ADMIN_EMAIL) {
+      const { data: profil } = await db.from('profils').select('statut').eq('id', data.user.id).single();
+      if (!profil || profil.statut !== 'actif') {
+        await db.auth.signOut();
+        showErr('login-error', '⏳ Votre compte est en attente de validation par l\'administrateur.');
+        return;
+      }
+    }
+    redirect(data.user.email);
+  }
+
+  // ══ INSCRIPTION ══
+  async function handleRegister() {
+    hideErr('register-error');
+    const prenom     = document.getElementById('reg-prenom').value.trim();
+    const nom        = document.getElementById('reg-nom').value.trim();
+    const email      = document.getElementById('reg-email').value.trim();
+    const tel        = document.getElementById('reg-tel').value.trim();
+    const entreprise = document.getElementById('reg-entreprise').value.trim();
+    const pwd        = document.getElementById('reg-password').value;
+
+    if (!prenom||!nom||!email||!pwd) { showErr('register-error','Veuillez remplir tous les champs obligatoires.'); return; }
+    if (pwd.length < 8) { showErr('register-error','Le mot de passe doit contenir au moins 8 caractères.'); return; }
+
+    setLoading('btn-register', true, 'Envoyer la demande →');
+
+    // 1. Créer le compte Auth
+    const { data, error } = await db.auth.signUp({ email, password: pwd });
+    if (error) {
+      setLoading('btn-register', false, 'Envoyer la demande →');
+      showErr('register-error', '⚠️ ' + (error.message.includes('already') ? 'Cet email est déjà enregistré.' : error.message));
+      return;
+    }
+
+    // 2. Créer le profil en_attente
+    await db.from('profils').insert({ id: data.user.id, email, prenom, nom, telephone: tel, entreprise, statut: 'en_attente' });
+
+    // 3. Email de notification admin (mailto fallback)
+    const subj = encodeURIComponent(`[Sillons] Nouvelle inscription : ${prenom} ${nom}`);
+    const body = encodeURIComponent(`Bonjour James,\n\nNouvelle demande d'inscription :\n\nNom : ${prenom} ${nom}\nEmail : ${email}\nTél. : ${tel||'—'}\nEntreprise : ${entreprise||'—'}\n\nValidez ce compte dans l'espace admin.\n\nCordialement`);
+    window.open(`mailto:${ADMIN_EMAIL}?subject=${subj}&body=${body}`);
+
+    await db.auth.signOut();
+    setLoading('btn-register', false, 'Envoyer la demande →');
+    document.getElementById('panel-register').style.display = 'none';
+    document.getElementById('success-register').style.display = 'block';
+  }
+</script>
+</body>
+</html>
