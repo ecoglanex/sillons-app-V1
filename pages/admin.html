@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Admin — Sillons Ferroviaires</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Bricolage+Grotesque:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../local-demo.js"></script>
+  <style>
+    :root{--bg:#0d0d0f;--bg2:#141417;--bg3:#1c1c21;--border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.12);--text:#f0f0f2;--muted:#6b6b7a;--accent:#e94560;--green:#22c55e;--amber:#f59e0b;--blue:#3b82f6;--red:#ef4444;--radius:10px;}
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{background:var(--bg);color:var(--text);font-family:'Bricolage Grotesque',sans-serif;min-height:100vh;display:flex;}
+
+    /* SIDEBAR */
+    .sidebar{width:220px;min-height:100vh;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:50;}
+    .sidebar-logo{padding:24px 20px 20px;border-bottom:1px solid var(--border);}
+    .sidebar-logo .badge{display:inline-flex;align-items:center;gap:6px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--accent);text-transform:uppercase;margin-bottom:8px;}
+    .sidebar-logo .badge::before{content:'';width:5px;height:5px;background:var(--accent);border-radius:50%;animation:blink 2s ease-in-out infinite;}
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+    .sidebar-logo h2{font-size:15px;font-weight:700;line-height:1.3;}
+    .sidebar-admin{padding:16px 20px;border-bottom:1px solid var(--border);}
+    .admin-avatar{width:36px;height:36px;background:var(--accent);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;margin-bottom:8px;}
+    .admin-name{font-size:13px;font-weight:600;}
+    .admin-email{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:2px;word-break:break-all;}
+    .sidebar-nav{flex:1;padding:12px 10px;}
+    .nav-label{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);font-family:'DM Mono',monospace;padding:0 10px;margin:16px 0 6px;}
+    .nav-item{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:7px;font-size:13.5px;font-weight:500;color:var(--muted);cursor:pointer;transition:all .15s;margin-bottom:2px;border:none;background:none;width:100%;text-align:left;}
+    .nav-item:hover{background:var(--bg3);color:var(--text);}
+    .nav-item.active{background:rgba(233,69,96,0.12);color:var(--accent);}
+    .nav-item .icon{font-size:15px;width:18px;text-align:center;}
+    .nav-badge{margin-left:auto;background:var(--accent);color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:20px;font-family:'DM Mono',monospace;}
+    .nav-badge.green{background:var(--green);}
+    .sidebar-bottom{padding:16px 10px;border-top:1px solid var(--border);}
+
+    /* MAIN */
+    .main{margin-left:220px;flex:1;min-height:100vh;display:flex;flex-direction:column;}
+    .topbar{height:56px;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 28px;gap:16px;position:sticky;top:0;background:var(--bg);z-index:40;}
+    .topbar h1{font-size:18px;font-weight:700;flex:1;}
+    .live-indicator{display:flex;align-items:center;gap:6px;font-size:12px;font-family:'DM Mono',monospace;color:var(--green);}
+    .live-dot{width:7px;height:7px;background:var(--green);border-radius:50%;animation:blink 1.5s ease-in-out infinite;}
+    .topbar-actions{display:flex;gap:8px;}
+    .btn-sm{padding:7px 14px;border-radius:7px;font-family:'Bricolage Grotesque',sans-serif;font-size:12.5px;font-weight:600;cursor:pointer;transition:all .15s;border:1px solid var(--border2);background:var(--bg3);color:var(--text);}
+    .btn-sm:hover{background:var(--bg2);}
+    .btn-sm.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+    .content{padding:28px;flex:1;}
+    .section{display:none;}
+    .section.active{display:block;animation:fadeUp .2s ease;}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+    /* KPI */
+    .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px;}
+    .kpi{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;position:relative;overflow:hidden;}
+    .kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+    .kpi.k-red::before{background:var(--accent);}
+    .kpi.k-green::before{background:var(--green);}
+    .kpi.k-amber::before{background:var(--amber);}
+    .kpi.k-blue::before{background:var(--blue);}
+    .kpi-label{font-size:11px;font-family:'DM Mono',monospace;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+    .kpi-value{font-size:32px;font-weight:800;line-height:1;margin-bottom:4px;}
+    .kpi-sub{font-size:12px;color:var(--muted);}
+
+    /* TABLE */
+    .table-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:24px;}
+    .table-header{padding:16px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);}
+    .table-title{font-size:14px;font-weight:700;}
+    .table-count{font-size:12px;color:var(--muted);font-family:'DM Mono',monospace;}
+    table{width:100%;border-collapse:collapse;}
+    th{text-align:left;padding:10px 16px;font-size:11px;font-family:'DM Mono',monospace;letter-spacing:1px;text-transform:uppercase;color:var(--muted);background:var(--bg3);border-bottom:1px solid var(--border);white-space:nowrap;}
+    td{padding:12px 16px;font-size:13px;border-bottom:1px solid var(--border);vertical-align:middle;}
+    tr:last-child td{border-bottom:none;}
+    tr:hover td{background:rgba(255,255,255,0.02);}
+    .badge{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;font-family:'DM Mono',monospace;white-space:nowrap;}
+    .badge::before{content:'';width:5px;height:5px;border-radius:50%;}
+    .badge-pending{background:rgba(245,158,11,0.12);color:var(--amber);border:1px solid rgba(245,158,11,0.25);}
+    .badge-pending::before{background:var(--amber);}
+    .badge-active{background:rgba(34,197,94,0.1);color:var(--green);border:1px solid rgba(34,197,94,0.2);}
+    .badge-active::before{background:var(--green);}
+    .badge-refused{background:rgba(239,68,68,0.1);color:var(--red);border:1px solid rgba(239,68,68,0.2);}
+    .badge-refused::before{background:var(--red);}
+    .action-btns{display:flex;gap:6px;}
+    .btn-action{padding:5px 10px;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;border:none;font-family:'Bricolage Grotesque',sans-serif;transition:all .15s;}
+    .btn-valider{background:rgba(34,197,94,0.15);color:var(--green);}
+    .btn-valider:hover{background:rgba(34,197,94,0.25);}
+    .btn-refuser{background:rgba(239,68,68,0.12);color:var(--red);}
+    .btn-refuser:hover{background:rgba(239,68,68,0.22);}
+    .btn-voir{background:rgba(255,255,255,0.06);color:var(--text);}
+    .btn-voir:hover{background:rgba(255,255,255,0.1);}
+    .btn-email{background:rgba(59,130,246,0.12);color:var(--blue);}
+    .btn-email:hover{background:rgba(59,130,246,0.22);}
+
+    /* FILTRES */
+    .filters{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap;}
+    .filter-input{background:var(--bg2);border:1px solid var(--border);border-radius:7px;padding:8px 12px;color:var(--text);font-family:'Bricolage Grotesque',sans-serif;font-size:13px;outline:none;transition:border-color .2s;appearance:none;}
+    .filter-input:focus{border-color:var(--accent);}
+    .filter-input::placeholder{color:var(--muted);}
+
+    /* MODAL */
+    .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:200;align-items:center;justify-content:center;padding:20px;}
+    .modal-overlay.show{display:flex;animation:fadeIn .2s ease;}
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+    .modal{background:var(--bg2);border:1px solid var(--border2);border-radius:14px;width:100%;max-width:580px;max-height:90vh;overflow-y:auto;}
+    .modal-header{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+    .modal-header h3{font-size:16px;font-weight:700;}
+    .modal-close{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1;}
+    .modal-close:hover{color:var(--text);}
+    .modal-body{padding:24px;}
+    .modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+    .modal-field label{display:block;font-size:10px;font-family:'DM Mono',monospace;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;}
+    .modal-field .val{font-size:14px;font-weight:500;}
+    .modal-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;}
+    .email-compose{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:16px;margin-top:16px;}
+    .email-compose textarea{width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--text);font-family:'DM Mono',monospace;font-size:12px;line-height:1.7;resize:vertical;min-height:120px;outline:none;}
+    .email-compose textarea:focus{border-color:var(--accent);}
+    .email-to{font-size:12px;color:var(--muted);font-family:'DM Mono',monospace;margin-bottom:8px;}
+    .email-to strong{color:var(--blue);}
+
+    /* TOAST */
+    .toast{position:fixed;bottom:24px;right:24px;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:14px 18px;font-size:13px;font-weight:500;display:none;align-items:center;gap:10px;z-index:300;min-width:260px;animation:slideUp .25s ease;}
+    .toast.show{display:flex;}
+    @keyframes slideUp{from{transform:translateY(16px);opacity:0}to{transform:translateY(0);opacity:1}}
+    .toast-dot{width:8px;height:8px;border-radius:50%;}
+    .empty{text-align:center;padding:48px 20px;color:var(--muted);}
+    .empty .icon{font-size:36px;margin-bottom:12px;opacity:.5;}
+    .empty p{font-size:14px;}
+    .spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    @media(max-width:900px){.sidebar{width:60px;}.sidebar-logo h2,.sidebar-admin,.nav-item span,.nav-label,.nav-badge{display:none;}.main{margin-left:60px;}.kpi-grid{grid-template-columns:1fr 1fr;}}
+    @media(max-width:600px){.kpi-grid{grid-template-columns:1fr;}.content{padding:16px;}}
+  </style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="badge">Admin</div>
+    <h2>Sillons<br/>Ferroviaires</h2>
+  </div>
+  <div class="sidebar-admin">
+    <div class="admin-avatar">JG</div>
+    <div class="admin-name">James Gigot</div>
+    <div class="admin-email">james.gigot@reseau.sncf.fr</div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-label">Navigation</div>
+    <button class="nav-item active" onclick="showSection('dashboard')"><span class="icon">📊</span><span>Tableau de bord</span></button>
+    <button class="nav-item" onclick="showSection('comptes')"><span class="icon">👤</span><span>Comptes</span><span class="nav-badge" id="badge-comptes">0</span></button>
+    <button class="nav-item" onclick="showSection('demandes')"><span class="icon">🚂</span><span>Demandes</span><span class="nav-badge green" id="badge-demandes">0</span></button>
+    <div class="nav-label">Outils</div>
+    <button class="nav-item" onclick="showSection('export')"><span class="icon">📤</span><span>Exporter</span></button>
+  </nav>
+  <div class="sidebar-bottom">
+    <button class="nav-item" onclick="deconnexion()"><span class="icon">🔒</span><span>Déconnexion</span></button>
+  </div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <h1 id="topbar-title">Tableau de bord</h1>
+    <div class="live-indicator"><div class="live-dot"></div>Temps réel</div>
+    <div class="topbar-actions">
+      <button class="btn-sm" onclick="chargerTout()">↻ Actualiser</button>
+      <button class="btn-sm primary" onclick="showSection('demandes')">Voir les demandes</button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- ══ DASHBOARD ══ -->
+    <div class="section active" id="section-dashboard">
+      <div class="kpi-grid">
+        <div class="kpi k-red"><div class="kpi-label">Comptes en attente</div><div class="kpi-value" id="kpi-pending">—</div><div class="kpi-sub">À valider</div></div>
+        <div class="kpi k-green"><div class="kpi-label">Comptes actifs</div><div class="kpi-value" id="kpi-active">—</div><div class="kpi-sub">Demandeurs</div></div>
+        <div class="kpi k-amber"><div class="kpi-label">Demandes reçues</div><div class="kpi-value" id="kpi-today">—</div><div class="kpi-sub">Ce mois</div></div>
+        <div class="kpi k-blue"><div class="kpi-label">Total demandes</div><div class="kpi-value" id="kpi-total">—</div><div class="kpi-sub">Depuis le début</div></div>
+      </div>
+      <div class="table-card">
+        <div class="table-header"><div class="table-title">⏳ Inscriptions en attente</div><button class="btn-sm" onclick="showSection('comptes')">Voir tout →</button></div>
+        <table><thead><tr><th>Nom</th><th>Email</th><th>Entreprise</th><th>Date</th><th>Actions</th></tr></thead>
+        <tbody id="tbody-pending-dash"></tbody></table>
+      </div>
+      <div class="table-card">
+        <div class="table-header"><div class="table-title">🚂 Dernières demandes</div><button class="btn-sm" onclick="showSection('demandes')">Voir tout →</button></div>
+        <table><thead><tr><th>Réf.</th><th>Demandeur</th><th>Matériel</th><th>Parcours</th><th>Date</th><th>Actions</th></tr></thead>
+        <tbody id="tbody-recent-dash"></tbody></table>
+      </div>
+    </div>
+
+    <!-- ══ COMPTES ══ -->
+    <div class="section" id="section-comptes">
+      <div class="filters">
+        <input class="filter-input" type="search" placeholder="🔍 Rechercher..." oninput="filtreC=this.value;renderComptes()" style="flex:1;min-width:200px;"/>
+        <select class="filter-input" onchange="filtreCS=this.value;renderComptes()">
+          <option value="">Tous les statuts</option><option value="en_attente">En attente</option><option value="actif">Actifs</option><option value="refusé">Refusés</option>
+        </select>
+      </div>
+      <div class="table-card">
+        <div class="table-header"><div class="table-title">👥 Gestion des comptes</div><span class="table-count" id="comptes-count"></span></div>
+        <table><thead><tr><th>Nom</th><th>Email</th><th>Tél.</th><th>Entreprise</th><th>Statut</th><th>Date</th><th>Actions</th></tr></thead>
+        <tbody id="tbody-comptes"></tbody></table>
+      </div>
+    </div>
+
+    <!-- ══ DEMANDES ══ -->
+    <div class="section" id="section-demandes">
+      <div class="filters">
+        <input class="filter-input" type="search" placeholder="🔍 Rechercher..." oninput="filtreD=this.value;renderDemandes()" style="flex:1;min-width:200px;"/>
+        <input class="filter-input" type="date" onchange="filtreDate=this.value;renderDemandes()" title="Filtrer par date"/>
+        <select class="filter-input" onchange="filtreParcours=this.value;renderDemandes()">
+          <option value="">Tous les parcours</option>
+          <option>AAA/BLG</option><option>BLG/AAA</option><option>BLG/BXB</option><option>CX/PIM</option><option>LS/CX</option><option>PIM/CX</option><option>ESL/V</option><option>V/ESL</option>
+        </select>
+      </div>
+      <div class="table-card">
+        <div class="table-header"><div class="table-title">📋 Toutes les demandes</div><span class="table-count" id="demandes-count"></span></div>
+        <table><thead><tr><th>Réf.</th><th>Date</th><th>Demandeur</th><th>Conducteur</th><th>Matériel</th><th>Tare</th><th>Long.</th><th>Parcours</th><th>Départ</th><th>Actions</th></tr></thead>
+        <tbody id="tbody-demandes"></tbody></table>
+      </div>
+    </div>
+
+    <!-- ══ EXPORT ══ -->
+    <div class="section" id="section-export">
+      <div class="table-card">
+        <div class="table-header"><div class="table-title">📤 Export des données</div></div>
+        <div style="padding:28px;display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+          <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:20px;">
+            <div style="font-size:28px;margin-bottom:12px;">📊</div>
+            <div style="font-size:14px;font-weight:700;margin-bottom:6px;">Demandes CSV</div>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:16px;">Exporter toutes les demandes</div>
+            <button class="btn-sm primary" onclick="exportCSV('demandes')">Télécharger CSV</button>
+          </div>
+          <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:20px;">
+            <div style="font-size:28px;margin-bottom:12px;">👥</div>
+            <div style="font-size:14px;font-weight:700;margin-bottom:6px;">Liste demandeurs</div>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:16px;">Exporter les comptes actifs</div>
+            <button class="btn-sm" onclick="exportCSV('comptes')">Télécharger CSV</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- MODAL DEMANDE -->
+<div class="modal-overlay" id="modal-demande">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>📋 Demande <span id="modal-ref" style="color:var(--accent);font-family:'DM Mono',monospace;font-size:13px;"></span></h3>
+      <button class="modal-close" onclick="closeModal('modal-demande')">✕</button>
+    </div>
+    <div class="modal-body"><div class="modal-grid" id="modal-demande-content"></div>
+      <div class="email-compose" id="email-compose" style="display:none;">
+        <div class="email-to">À : <strong id="email-to-addr"></strong></div>
+        <textarea id="email-body"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-sm" onclick="toggleEmailCompose()">✉️ Répondre</button>
+      <button class="btn-sm" onclick="closeModal('modal-demande')">Fermer</button>
+      <button class="btn-sm primary" onclick="sendEmail()">Envoyer →</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL COMPTE -->
+<div class="modal-overlay" id="modal-compte">
+  <div class="modal">
+    <div class="modal-header"><h3>👤 Validation du compte</h3><button class="modal-close" onclick="closeModal('modal-compte')">✕</button></div>
+    <div class="modal-body" id="modal-compte-content"></div>
+    <div class="modal-footer">
+      <button class="btn-sm btn-refuser" onclick="actionCompte('refusé')">✗ Refuser</button>
+      <button class="btn-sm btn-valider" onclick="actionCompte('actif')">✓ Valider le compte</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"><div class="toast-dot" id="toast-dot"></div><span id="toast-msg"></span></div>
+
+<script>
+  // ══ Config ══
+  const SUPABASE_URL      = 'https://ytcubodufgwqjiblkigi.supabase.co'; // ← À remplacer
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl0Y3Vib2R1Zmd3cWppYmxraWdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNDA4MzcsImV4cCI6MjA5MTkxNjgzN30.EPaQ7Z6K8G9UJ4k5q69pAWZ_x5ZNVjGh9c-5rJk4is4
+
+
+';  // ← À remplacer
+  const ADMIN_EMAIL       = 'james.gigot@reseau.sncf.fr';
+
+  const { createClient } = supabase;
+  const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  let comptes=[], demandes=[];
+  let filtreC='', filtreCS='', filtreD='', filtreDate='', filtreParcours='';
+  let currentCompteId=null, currentDemandeId=null;
+
+  const TITLES = {dashboard:'Tableau de bord',comptes:'Gestion des comptes',demandes:'Demandes de sillons',export:'Export'};
+
+  // ══ GUARD ADMIN ══
+  (async () => {
+    const { data:{ session } } = await db.auth.getSession();
+    if (!session || session.user.email !== ADMIN_EMAIL) {
+      window.location.href = '../index.html'; return;
+    }
+    await chargerTout();
+    abonnerTempsReel();
+  })();
+
+  async function deconnexion() { await db.auth.signOut(); window.location.href='../index.html'; }
+
+  // ═══════════════════════════════════
+  //  CHARGEMENT DONNÉES SUPABASE
+  // ═══════════════════════════════════
+  async function chargerTout() {
+    await Promise.all([chargerComptes(), chargerDemandes()]);
+    renderDashboard();
+  }
+
+  async function chargerComptes() {
+    const { data, error } = await db.from('profils').select('*').order('created_at', { ascending: false });
+    if (error) { toast('Erreur chargement comptes : ' + error.message, 'red'); return; }
+    comptes = data || [];
+    updateBadges();
+  }
+
+  async function chargerDemandes() {
+    const { data, error } = await db.from('demandes').select('*').order('created_at', { ascending: false });
+    if (error) { toast('Erreur chargement demandes : ' + error.message, 'red'); return; }
+    demandes = (data || []).map(d => {
+      const owner = comptes.find(c => c.id === d.user_id);
+      return { ...d, email: owner?.email || '' };
+    });
+    updateBadges();
+  }
+
+  // ═══════════════════════════════════
+  //  TEMPS RÉEL — Supabase Realtime
+  // ═══════════════════════════════════
+  function abonnerTempsReel() {
+    // Écouter les nouveaux comptes
+    db.channel('profils-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profils' }, async () => {
+        await chargerComptes();
+        renderDashboard();
+        if (document.getElementById('section-comptes').classList.contains('active')) renderComptes();
+        toast('👤 Nouveaux comptes mis à jour', 'blue');
+      })
+      .subscribe();
+
+    // Écouter les nouvelles demandes
+    db.channel('demandes-changes')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'demandes' }, async (payload) => {
+        await chargerDemandes();
+        renderDashboard();
+        if (document.getElementById('section-demandes').classList.contains('active')) renderDemandes();
+        toast('🚂 Nouvelle demande : ' + payload.new.reference, 'green');
+      })
+      .subscribe();
+  }
+
+  // ═══════════════════════════════════
+  //  NAVIGATION
+  // ═══════════════════════════════════
+  function showSection(id) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+    document.getElementById('section-'+id).classList.add('active');
+    document.querySelectorAll('.nav-item')[['dashboard','comptes','demandes','export'].indexOf(id)].classList.add('active');
+    document.getElementById('topbar-title').textContent = TITLES[id];
+    if (id==='comptes') renderComptes();
+    if (id==='demandes') renderDemandes();
+    if (id==='dashboard') renderDashboard();
+  }
+
+  function updateBadges() {
+    document.getElementById('badge-comptes').textContent  = comptes.filter(c=>c.statut==='en_attente').length;
+    document.getElementById('badge-demandes').textContent = demandes.length;
+  }
+
+  // ═══════════════════════════════════
+  //  RENDER DASHBOARD
+  // ═══════════════════════════════════
+  function renderDashboard() {
+    const pending = comptes.filter(c=>c.statut==='en_attente');
+    const active  = comptes.filter(c=>c.statut==='actif');
+    const now     = new Date();
+    const thisMo  = demandes.filter(d=>{const dt=new Date(d.created_at);return dt.getMonth()===now.getMonth()&&dt.getFullYear()===now.getFullYear();});
+
+    document.getElementById('kpi-pending').textContent = pending.length;
+    document.getElementById('kpi-active').textContent  = active.length;
+    document.getElementById('kpi-today').textContent   = thisMo.length;
+    document.getElementById('kpi-total').textContent   = demandes.length;
+
+    const tbP = document.getElementById('tbody-pending-dash');
+    tbP.innerHTML = pending.length ? pending.slice(0,5).map(c=>`
+      <tr>
+        <td><strong>${c.prenom} ${c.nom}</strong></td>
+        <td style="font-family:'DM Mono',monospace;font-size:12px;color:var(--blue)">${c.id}</td>
+        <td>${c.entreprise||'—'}</td>
+        <td style="font-size:12px;color:var(--muted);font-family:'DM Mono',monospace">${c.created_at?.slice(0,10)||'—'}</td>
+        <td><div class="action-btns">
+          <button class="btn-action btn-valider" onclick="openCompte('${c.id}')">Valider</button>
+          <button class="btn-action btn-voir" onclick="openCompte('${c.id}')">Voir</button>
+        </div></td>
+      </tr>`).join('')
+      : `<tr><td colspan="5"><div class="empty"><div class="icon">✅</div><p>Aucun compte en attente</p></div></td></tr>`;
+
+    const tbD = document.getElementById('tbody-recent-dash');
+    tbD.innerHTML = demandes.slice(0,4).map(d=>`
+      <tr>
+        <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--accent)">${d.reference}</td>
+        <td><strong>${d.demandeur}</strong></td>
+        <td>${d.materiel}</td>
+        <td style="font-family:'DM Mono',monospace;font-size:12px">${d.parcours}</td>
+        <td style="color:var(--muted);font-size:12px">${d.date_souhaitee||d.created_at?.slice(0,10)}</td>
+        <td><div class="action-btns">
+          <button class="btn-action btn-voir" onclick="openDemande('${d.id}')">Détail</button>
+          <button class="btn-action btn-email" onclick="prepEmail('${d.id}')">✉</button>
+        </div></td>
+      </tr>`).join('');
+  }
+
+  // ═══════════════════════════════════
+  //  RENDER COMPTES
+  // ═══════════════════════════════════
+  function renderComptes() {
+    let data = comptes.filter(c=>{
+      const q = filtreC.toLowerCase();
+      return (!q||(c.prenom+' '+c.nom+' '+(c.telephone||'')+' '+(c.entreprise||'')).toLowerCase().includes(q))
+        && (!filtreCS || c.statut===filtreCS);
+    });
+    document.getElementById('comptes-count').textContent = data.length + ' compte' + (data.length>1?'s':'');
+    document.getElementById('tbody-comptes').innerHTML = data.map(c=>{
+      const bc = c.statut==='actif'?'badge-active':c.statut==='en_attente'?'badge-pending':'badge-refused';
+      const bl = c.statut==='actif'?'Actif':c.statut==='en_attente'?'En attente':'Refusé';
+      return `<tr>
+        <td><strong>${c.prenom} ${c.nom}</strong></td>
+        <td style="font-family:'DM Mono',monospace;font-size:12px;color:var(--blue)">${c.id?.slice(0,20)}…</td>
+        <td style="font-family:'DM Mono',monospace;font-size:12px">${c.telephone||'—'}</td>
+        <td>${c.entreprise||'—'}</td>
+        <td><span class="badge ${bc}">${bl}</span></td>
+        <td style="color:var(--muted);font-size:12px;font-family:'DM Mono',monospace">${c.created_at?.slice(0,10)||'—'}</td>
+        <td><div class="action-btns">
+          ${c.statut==='en_attente'?`<button class="btn-action btn-valider" onclick="openCompte('${c.id}')">✓ Valider</button><button class="btn-action btn-refuser" onclick="majStatutCompte('${c.id}','refusé')">✗</button>`:''}
+          <button class="btn-action btn-email" onclick="emailCompte('${c.id}')">✉</button>
+        </div></td>
+      </tr>`;
+    }).join('') || `<tr><td colspan="7"><div class="empty"><div class="icon">👤</div><p>Aucun résultat</p></div></td></tr>`;
+  }
+
+  // ═══════════════════════════════════
+  //  RENDER DEMANDES
+  // ═══════════════════════════════════
+  function renderDemandes() {
+    let data = demandes.filter(d=>{
+      const q = filtreD.toLowerCase();
+      return (!q||(d.reference+' '+d.demandeur+' '+d.materiel+' '+d.conducteur).toLowerCase().includes(q))
+        && (!filtreDate || d.date_souhaitee===filtreDate)
+        && (!filtreParcours || d.parcours===filtreParcours);
+    });
+    document.getElementById('demandes-count').textContent = data.length + ' demande' + (data.length>1?'s':'');
+    document.getElementById('tbody-demandes').innerHTML = data.map(d=>`
+      <tr>
+        <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--accent)">${d.reference}</td>
+        <td style="font-size:12px;color:var(--muted);font-family:'DM Mono',monospace">${d.date_souhaitee||'—'}</td>
+        <td><strong>${d.demandeur}</strong></td>
+        <td style="font-size:12px">${d.conducteur}</td>
+        <td>${d.materiel}</td>
+        <td style="font-family:'DM Mono',monospace;font-size:12px">${d.tare||'—'}t</td>
+        <td style="font-family:'DM Mono',monospace;font-size:12px">${d.longueur||'—'}m</td>
+        <td><span style="font-family:'DM Mono',monospace;font-size:12px;background:rgba(59,130,246,0.1);padding:2px 7px;border-radius:4px;color:var(--blue)">${d.parcours}</span></td>
+        <td style="font-family:'DM Mono',monospace;font-size:12px">${d.heure_depart||'—'}</td>
+        <td><div class="action-btns">
+          <button class="btn-action btn-voir" onclick="openDemande('${d.id}')">Détail</button>
+          <button class="btn-action btn-email" onclick="prepEmail('${d.id}')">✉</button>
+        </div></td>
+      </tr>`).join('') || `<tr><td colspan="10"><div class="empty"><div class="icon">🚂</div><p>Aucune demande trouvée</p></div></td></tr>`;
+  }
+
+  // ═══════════════════════════════════
+  //  ACTIONS COMPTES
+  // ═══════════════════════════════════
+  function openCompte(id) {
+    const c = comptes.find(x=>x.id===id);
+    if (!c) return;
+    currentCompteId = id;
+    document.getElementById('modal-compte-content').innerHTML = `
+      <div class="modal-grid">
+        <div class="modal-field"><label>Prénom</label><div class="val">${c.prenom}</div></div>
+        <div class="modal-field"><label>Nom</label><div class="val">${c.nom}</div></div>
+        <div class="modal-field"><label>Téléphone</label><div class="val">${c.telephone||'—'}</div></div>
+        <div class="modal-field"><label>Entreprise</label><div class="val">${c.entreprise||'—'}</div></div>
+        <div class="modal-field"><label>Inscription</label><div class="val">${c.created_at?.slice(0,10)||'—'}</div></div>
+        <div class="modal-field"><label>Statut</label><div class="val"><span class="badge ${c.statut==='actif'?'badge-active':'badge-pending'}">${c.statut}</span></div></div>
+      </div>
+      ${c.statut==='en_attente'?`<div style="margin-top:16px;padding:12px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:8px;font-size:13px;color:var(--amber)">⚠️ En validant, un email sera ouvert pour informer le demandeur.</div>`:''}`;
+    document.getElementById('modal-compte').classList.add('show');
+  }
+
+  async function actionCompte(statut) {
+    if (!currentCompteId) return;
+    await majStatutCompte(currentCompteId, statut);
+    closeModal('modal-compte');
+  }
+
+  async function majStatutCompte(id, statut) {
+    const { error } = await db.from('profils').update({ statut }).eq('id', id);
+    if (error) { toast('Erreur : ' + error.message, 'red'); return; }
+    const c = comptes.find(x=>x.id===id);
+    if (c) {
+      c.statut = statut;
+      // Email notification
+      const action = statut==='actif' ? 'validé' : 'refusé';
+      const subj = encodeURIComponent(`[Sillons] Votre compte a été ${action}`);
+      const body = encodeURIComponent(`Bonjour ${c.prenom} ${c.nom},\n\nVotre compte sur la plateforme Sillons Ferroviaires a été ${action}.\n${statut==='actif'?'\nVous pouvez maintenant vous connecter et soumettre vos demandes.':'\nPour plus d\'informations, contactez l\'administrateur.'}\n\nCordialement,\nJames Gigot`);
+      window.open(`mailto:${encodeURIComponent(c.email || ADMIN_EMAIL)}?subject=${subj}&body=${body}`);
+    }
+    toast(statut==='actif' ? '✅ Compte validé' : '✗ Compte refusé', statut==='actif'?'green':'red');
+    renderDashboard(); renderComptes(); updateBadges();
+  }
+
+  function emailCompte(id) {
+    const c = comptes.find(x=>x.id===id);
+    if (!c) return;
+    const subj = encodeURIComponent('[Sillons] Information sur votre compte');
+    const body = encodeURIComponent(`Bonjour ${c.prenom} ${c.nom},\n\n\n\nCordialement,\nJames Gigot\nGestionnaire sillons — SNCF Réseau`);
+    // Note: on n'a pas l'email directement dans profils, on utilise id qui est l'UUID
+    // En production, récupérer l'email via auth.admin.getUserById (côté serveur)
+    window.open(`mailto:${encodeURIComponent(c.email || ADMIN_EMAIL)}?subject=${subj}&body=${body}`);
+    toast('✉️ Ouvre ton client email', 'blue');
+  }
+
+  // ═══════════════════════════════════
+  //  MODAL DEMANDE
+  // ═══════════════════════════════════
+  function openDemande(id) {
+    const d = demandes.find(x=>x.id===id);
+    if (!d) return;
+    currentDemandeId = id;
+    document.getElementById('modal-ref').textContent = d.reference;
+    document.getElementById('modal-demande-content').innerHTML = `
+      <div class="modal-field"><label>Référence</label><div class="val" style="font-family:'DM Mono',monospace;color:var(--accent)">${d.reference}</div></div>
+      <div class="modal-field"><label>Date souhaitée</label><div class="val">${d.date_souhaitee||'—'}</div></div>
+      <div class="modal-field"><label>Demandeur</label><div class="val"><strong>${d.demandeur}</strong></div></div>
+      <div class="modal-field"><label>Conducteur</label><div class="val">${d.conducteur}</div></div>
+      <div class="modal-field"><label>Matériel</label><div class="val">${d.materiel}</div></div>
+      <div class="modal-field"><label>Parcours</label><div class="val" style="font-family:'DM Mono',monospace;color:var(--blue)">${d.parcours}</div></div>
+      <div class="modal-field"><label>Tare</label><div class="val">${d.tare||'—'} t</div></div>
+      <div class="modal-field"><label>Longueur</label><div class="val">${d.longueur||'—'} m</div></div>
+      <div class="modal-field"><label>VL</label><div class="val">${d.vl||'—'} km/h</div></div>
+      <div class="modal-field"><label>Catégorie</label><div class="val">${d.categorie||'—'}</div></div>
+      <div class="modal-field"><label>Départ demandé</label><div class="val">${d.heure_depart||'—'}</div></div>
+      <div class="modal-field"><label>Arrivée demandée</label><div class="val">${d.heure_arrivee||'—'}</div></div>
+      ${d.code_statut?`<div class="modal-field"><label>Code statut</label><div class="val"><span class="badge badge-pending">${d.code_statut}</span></div></div>`:''}
+      ${d.remarques?`<div class="modal-field" style="grid-column:span 2"><label>Remarques</label><div class="val" style="color:var(--amber)">${d.remarques}</div></div>`:''}
+    `;
+    document.getElementById('email-compose').style.display='none';
+    document.getElementById('modal-demande').classList.add('show');
+  }
+
+  function prepEmail(id) {
+    openDemande(id);
+    setTimeout(()=>toggleEmailCompose(), 150);
+  }
+
+  function toggleEmailCompose() {
+    const el = document.getElementById('email-compose');
+    const d = demandes.find(x=>x.id===currentDemandeId);
+    if (el.style.display==='none'||!el.style.display) {
+      if (d) {
+        document.getElementById('email-to-addr').textContent = (d.email || d.demandeur || 'demandeur') + ' (destinataire de réponse)';
+        document.getElementById('email-body').value =
+`Bonjour ${d.demandeur},
+
+Suite à votre demande de sillon ${d.reference} du ${d.date_souhaitee} :
+- Matériel : ${d.materiel}
+- Parcours : ${d.parcours}
+- Départ demandé : ${d.heure_depart||'—'}
+
+[Votre réponse ici]
+
+Cordialement,
+James Gigot — SNCF Réseau`;
+      }
+      el.style.display = 'block';
+    } else { el.style.display='none'; }
+  }
+
+  function sendEmail() {
+    const body = document.getElementById('email-body').value;
+    const d = demandes.find(x=>x.id===currentDemandeId);
+    if (!body.trim()) { toast('⚠️ Message vide', 'amber'); return; }
+    const subj = encodeURIComponent('Réponse demande ' + (d?d.reference:'sillon'));
+    window.open(`mailto:${encodeURIComponent((d && d.email) || ADMIN_EMAIL)}?subject=${subj}&body=${encodeURIComponent(body)}`);
+    toast('✉️ Client email ouvert', 'blue');
+  }
+
+  function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+  document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('show');}));
+
+  // ═══════════════════════════════════
+  //  EXPORT CSV
+  // ═══════════════════════════════════
+  function exportCSV(type) {
+    let rows, filename;
+    if (type==='demandes') {
+      rows = [['Ref','Date','Demandeur','Conducteur','Materiel','Tare','Longueur','VL','Cat','Parcours','Depart','Arrivee','Statut','Remarques'],
+        ...demandes.map(d=>[d.reference,d.date_souhaitee,d.demandeur,d.conducteur,d.materiel,d.tare,d.longueur,d.vl,d.categorie,d.parcours,d.heure_depart,d.heure_arrivee,d.code_statut,d.remarques])];
+      filename = 'demandes-sillons.csv';
+    } else {
+      rows = [['Prenom','Nom','Telephone','Entreprise','Statut','Date'],
+        ...comptes.map(c=>[c.prenom,c.nom,c.telephone,c.entreprise,c.statut,c.created_at?.slice(0,10)])];
+      filename = 'comptes-demandeurs.csv';
+    }
+    const csv = rows.map(r=>r.map(v=>'"'+(v||'').toString().replace(/"/g,'""')+'"').join(',')).join('\n');
+    const a = document.createElement('a');
+    a.href = 'data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);
+    a.download = filename; a.click();
+    toast('📊 Export téléchargé', 'green');
+  }
+
+  // ══ TOAST ══
+  function toast(msg, color) {
+    const t=document.getElementById('toast');
+    document.getElementById('toast-msg').textContent=msg;
+    document.getElementById('toast-dot').style.background=color==='green'?'var(--green)':color==='red'?'var(--red)':color==='blue'?'var(--blue)':'var(--amber)';
+    t.classList.add('show');
+    setTimeout(()=>t.classList.remove('show'),3500);
+  }
+</script>
+</body>
+</html>

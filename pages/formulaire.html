@@ -1,1 +1,369 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Nouvelle demande — Sillons</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../local-demo.js"></script>
+  <style>
+    :root{--rail:#1a1a2e;--rail-mid:#16213e;--accent:#e94560;--accent2:#f5a623;--success:#22c55e;--text:#eaeaea;--text-muted:#8a8fa8;--surface:rgba(255,255,255,0.04);--surface2:rgba(255,255,255,0.07);--border:rgba(255,255,255,0.08);--radius:12px;}
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{background:var(--rail);color:var(--text);font-family:'Syne',sans-serif;min-height:100vh;}
+    header{background:var(--rail-mid);border-bottom:1px solid var(--border);padding:0 32px;display:flex;align-items:center;justify-content:space-between;height:60px;position:sticky;top:0;z-index:100;}
+    .logo{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:700;}
+    .logo-dot{width:8px;height:8px;background:var(--accent);border-radius:50%;animation:pulse 1.8s ease-in-out infinite;}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+    .logo span{color:var(--text-muted);font-weight:400;font-size:13px;margin-left:4px;}
+    .user-info{display:flex;align-items:center;gap:12px;font-size:13px;color:var(--text-muted);}
+    .user-badge{background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:5px 12px;font-size:12px;font-family:'DM Mono',monospace;}
+    .btn-logout{background:none;border:1px solid var(--border);color:var(--text-muted);padding:5px 12px;border-radius:6px;font-size:12px;cursor:pointer;font-family:'Syne',sans-serif;transition:all .2s;}
+    .btn-logout:hover{border-color:var(--accent);color:var(--accent);}
+    .container{max-width:900px;margin:0 auto;padding:40px 24px 80px;}
+    .page-header{margin-bottom:36px;}
+    .page-header h1{font-size:28px;font-weight:800;letter-spacing:-0.5px;}
+    .page-header h1 em{color:var(--accent);font-style:normal;}
+    .page-header p{margin-top:8px;color:var(--text-muted);font-size:14px;}
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px;margin-bottom:20px;}
+    .card-title{font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--accent);font-family:'DM Mono',monospace;margin-bottom:22px;display:flex;align-items:center;gap:8px;}
+    .card-title::after{content:'';flex:1;height:1px;background:var(--border);}
+    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+    .grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;}
+    .grid-4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:14px;}
+    .field{margin-bottom:0;}
+    .field label{display:block;font-size:11px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);margin-bottom:7px;font-family:'DM Mono',monospace;}
+    .field label .req{color:var(--accent);}
+    .field input,.field select,.field textarea{width:100%;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:8px;padding:11px 13px;color:var(--text);font-family:'Syne',sans-serif;font-size:14px;outline:none;transition:border-color .2s,background .2s;appearance:none;}
+    .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent);background:rgba(233,69,96,0.05);}
+    .field input::placeholder,.field textarea::placeholder{color:var(--text-muted);opacity:.6;}
+    .field select option{background:#1a1a2e;color:var(--text);}
+    .field textarea{resize:vertical;min-height:80px;}
+    .field input.auto-filled{border-color:rgba(34,197,94,0.4);background:rgba(34,197,94,0.05);color:var(--success);}
+    .mat-info{display:none;margin-top:8px;background:rgba(245,166,35,0.08);border:1px solid rgba(245,166,35,0.2);border-radius:6px;padding:8px 12px;font-size:12px;font-family:'DM Mono',monospace;color:var(--accent2);}
+    .mat-info.visible{display:flex;gap:16px;flex-wrap:wrap;}
+    .actions{display:flex;gap:12px;margin-top:28px;justify-content:flex-end;}
+    .btn-secondary{padding:12px 24px;background:none;border:1px solid var(--border);color:var(--text-muted);border-radius:8px;font-family:'Syne',sans-serif;font-size:14px;cursor:pointer;transition:all .2s;}
+    .btn-secondary:hover{border-color:var(--text-muted);color:var(--text);}
+    .btn-primary{padding:12px 32px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-family:'Syne',sans-serif;font-size:15px;font-weight:700;cursor:pointer;transition:transform .15s,box-shadow .15s,opacity .2s;letter-spacing:.5px;}
+    .btn-primary:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 20px rgba(233,69,96,0.35);}
+    .btn-primary:disabled{opacity:.6;cursor:not-allowed;}
+    .spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px;}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .success-overlay{display:none;position:fixed;inset:0;background:rgba(26,26,46,0.95);z-index:200;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:40px;animation:fadeIn .3s ease;}
+    .success-overlay.show{display:flex;}
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+    .success-icon{font-size:64px;margin-bottom:24px;animation:bounce .5s ease .2s both;}
+    @keyframes bounce{from{transform:scale(.5);opacity:0}to{transform:scale(1);opacity:1}}
+    .success-overlay h2{font-size:28px;font-weight:800;margin-bottom:12px;}
+    .success-overlay h2 em{color:var(--accent);font-style:normal;}
+    .success-overlay p{color:var(--text-muted);max-width:400px;line-height:1.7;margin-bottom:32px;}
+    .success-ref{font-family:'DM Mono',monospace;font-size:13px;background:var(--surface2);border:1px solid var(--border);padding:10px 20px;border-radius:8px;color:var(--accent2);margin-bottom:28px;}
+    .btn-new{padding:12px 32px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;cursor:pointer;}
+    @media(max-width:640px){.grid-2,.grid-3,.grid-4{grid-template-columns:1fr;}}
+  </style>
+</head>
+<body>
 
+<header>
+  <div class="logo">
+    <div class="logo-dot"></div>
+    Sillons Ferroviaires
+    <span>/ Nouvelle demande</span>
+  </div>
+  <div class="user-info">
+    <div class="user-badge" id="user-name">Chargement...</div>
+    <button class="btn-logout" onclick="deconnexion()">Déconnexion</button>
+  </div>
+</header>
+
+<div class="container">
+  <div class="page-header">
+    <h1>Nouvelle demande de <em>sillon</em></h1>
+    <p>Les champs marqués <span style="color:var(--accent)">*</span> sont obligatoires.</p>
+  </div>
+
+  <!-- 01 DEMANDE -->
+  <div class="card">
+    <div class="card-title">01 — Demande</div>
+    <div class="grid-2">
+      <div class="field"><label>Date souhaitée <span class="req">*</span></label><input type="date" id="f-date"/></div>
+      <div class="field"><label>Demandeur <span class="req">*</span></label><input type="text" id="f-demandeur" placeholder="Nom du demandeur"/></div>
+    </div>
+  </div>
+
+  <!-- 02 MATÉRIEL -->
+  <div class="card">
+    <div class="card-title">02 — Matériel & Circulation</div>
+    <div class="grid-2" style="margin-bottom:16px;">
+      <div class="field">
+        <label>Conducteur <span class="req">*</span></label>
+        <select id="f-conducteur">
+          <option value="">— Sélectionner —</option>
+          <option>SARAZAC Eric</option><option>NICOT Laurent</option><option>CHEZEAUD Philippe</option>
+          <option>DAUDON Romuald</option><option>DILIEU JM</option><option>AMROUCHE Houari</option>
+          <option>AUDY Laurent</option><option>BALLOT Vincent</option><option>BARRIERE Jean-Philippe</option>
+          <option>CHAUPRADE Philippe</option><option>FACCHIN David</option><option>DEZERAUD Christian</option>
+          <option>LUZOLO Filipe</option><option>THUILIER Guillaume</option><option>VUILLOD Patrick</option>
+          <option>BALAGE Cédric</option><option>LEPETIT Michael</option><option>RAMEAU Olivier</option>
+          <option>SANDRE Vincent</option><option>VEDEL Pierre</option><option>SERRE Pascal</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Matériel <span class="req">*</span></label>
+        <select id="f-materiel" onchange="autoFill(this.value)">
+          <option value="">— Sélectionner —</option>
+          <option>22200 HLP</option><option>66400 + US15 + 66400</option><option>67400 HLP</option>
+          <option>67400 UM</option><option>69000 + Mauzin 216 + 69000 DSDM</option>
+          <option>69000 + Mauzin 216 + 69000 Gesico</option><option>69000 PF3 DSDM</option>
+          <option>69000 + PF3 Gesico</option><option>69000 + U26</option><option>69000 HLP</option>
+          <option>69000 UM</option><option>7200 HLP</option><option>APMC</option>
+          <option>B108 275</option><option>B108 275 + canto</option><option>B108 32U Eiffage</option>
+          <option>B108 GS4</option><option>B108 GS4 + canto</option><option>B1-N eiffage</option>
+          <option>B2-N Eiffage</option><option>Bourreuse Delcourt</option><option>Bourreuse Bonobrini</option>
+          <option>EMV97 + canto</option><option>Dr 8144</option><option>Dr 8148</option>
+          <option>Dr 8148 + wagon</option><option>Dr 8154</option><option>Dr 8154 + wagon</option>
+          <option>Dr 9701</option><option>Dr 9701 + 1 Wg</option><option>Dr 9701 + 2 Wgets</option>
+          <option>Dr 9704</option><option>Dr 9704 + 1 Wg</option><option>Dr 9704 + 2 Wgets</option>
+        </select>
+      </div>
+    </div>
+    <div class="mat-info" id="mat-info">
+      Tare : <strong id="i-tare">—</strong> &nbsp;|&nbsp;
+      Longueur : <strong id="i-long">—</strong> &nbsp;|&nbsp;
+      VL : <strong id="i-vl">—</strong> &nbsp;|&nbsp;
+      Cat. : <strong id="i-cat">—</strong>
+    </div>
+    <div class="grid-4" style="margin-top:16px;">
+      <div class="field"><label>Tare (t)</label><input type="number" id="f-tare" readonly/></div>
+      <div class="field"><label>Longueur (m)</label><input type="number" id="f-longueur" readonly/></div>
+      <div class="field"><label>VL (km/h)</label><input type="number" id="f-vl" readonly/></div>
+      <div class="field"><label>Catégorie</label><input type="text" id="f-cat" readonly/></div>
+    </div>
+  </div>
+
+  <!-- 03 HORAIRES -->
+  <div class="card">
+    <div class="card-title">03 — Horaires & Parcours</div>
+    <div class="grid-3">
+      <div class="field">
+        <label>Parcours <span class="req">*</span></label>
+        <select id="f-parcours">
+          <option value="">— Sélectionner —</option>
+          <option>AAA/BLG</option><option>BLG/AAA</option><option>BLG/BXB</option><option>BLG/LS</option>
+          <option>BXB/BLG</option><option>BXB/ESL</option><option>CX/REL</option><option>CX/LS</option>
+          <option>CX/PIM</option><option>ESL/BXB</option><option>ESL/V</option><option>IS/REL</option>
+          <option>LS/BLG</option><option>LS/CX</option><option>LS/SSL</option><option>PIM/CX</option>
+          <option>PIM/UE</option><option>REL/CX</option><option>REL/IS</option><option>SSL/LS</option>
+          <option>UE/PIM</option><option>V/ESL</option><option>BLG/SOU</option>
+        </select>
+      </div>
+      <div class="field"><label>Heure départ demandée</label><input type="time" id="f-heure-dep"/></div>
+      <div class="field"><label>Heure arrivée demandée</label><input type="time" id="f-heure-arr"/></div>
+    </div>
+  </div>
+
+  <!-- 04 COMPLÉMENTAIRES -->
+  <div class="card">
+    <div class="card-title">04 — Informations complémentaires</div>
+    <div class="grid-2">
+      <div class="field">
+        <label>Code statut</label>
+        <select id="f-code-statut">
+          <option value="">— Optionnel —</option>
+          <option value="ITA">ITA</option><option value="TDH">TDH</option>
+          <option value="non-conformité">Non-conformité</option><option value="Pas Roulé">Pas Roulé</option>
+        </select>
+      </div>
+      <div class="field"><label>VDS</label><input type="text" id="f-vds" placeholder="Ex : Validé, En attente..."/></div>
+    </div>
+    <div class="field" style="margin-top:16px;"><label>Remarques / Observations</label><textarea id="f-remarques" placeholder="Informations complémentaires..."></textarea></div>
+  </div>
+
+  <div class="actions">
+    <button class="btn-secondary" onclick="resetForm()">Réinitialiser</button>
+    <button class="btn-primary" id="btn-submit" onclick="soumettre()">Envoyer la demande →</button>
+  </div>
+</div>
+
+<!-- OVERLAY SUCCÈS -->
+<div class="success-overlay" id="success-overlay">
+  <div class="success-icon">🚂</div>
+  <h2>Demande <em>envoyée !</em></h2>
+  <p>Votre demande a bien été enregistrée et transmise à l'administrateur.</p>
+  <div class="success-ref" id="success-ref"></div>
+  <button class="btn-new" onclick="nouvelleDemande()">+ Nouvelle demande</button>
+</div>
+
+<script>
+  // ══ Config — mêmes valeurs que index.html ══
+  const SUPABASE_URL      = 'https://ytcubodufgwqjiblkigi.supabase.co'; // ← À remplacer
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl0Y3Vib2R1Zmd3cWppYmxraWdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNDA4MzcsImV4cCI6MjA5MTkxNjgzN30.EPaQ7Z6K8G9UJ4k5q69pAWZ_x5ZNVjGh9c-5rJk4is4
+
+';  // ← À remplacer
+  const ADMIN_EMAIL       = 'james.gigot@reseau.sncf.fr';
+
+  const { createClient } = supabase;
+  const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  let currentUser = null;
+
+  // ── Guard auth + charger le profil ──
+  (async () => {
+    const { data:{ session } } = await db.auth.getSession();
+    if (!session) { window.location.href = '../index.html'; return; }
+    currentUser = session.user;
+
+    // Récupérer le profil pour afficher le nom
+    const { data: profil } = await db.from('profils').select('prenom,nom').eq('id', currentUser.id).single();
+    if (profil) {
+      document.getElementById('user-name').textContent = profil.prenom + ' ' + profil.nom;
+      document.getElementById('f-demandeur').value = profil.prenom + ' ' + profil.nom;
+    } else {
+      document.getElementById('user-name').textContent = currentUser.email;
+    }
+    // Date du jour par défaut
+    document.getElementById('f-date').value = new Date().toISOString().split('T')[0];
+  })();
+
+  async function deconnexion() {
+    await db.auth.signOut();
+    window.location.href = '../index.html';
+  }
+
+  // ── Données matériels ──
+  const MAT = {
+    "22200 HLP":{tare:90,long:20,vl:100,cat:"S/c"},
+    "66400 + US15 + 66400":{tare:133,long:62,vl:60,cat:"A"},
+    "67400 HLP":{tare:83,long:20,vl:100,cat:"S/c"},
+    "67400 UM":{tare:166,long:40,vl:100,cat:"S/c"},
+    "69000 + Mauzin 216 + 69000 DSDM":{tare:204,long:58,vl:100,cat:"S/C"},
+    "69000 + Mauzin 216 + 69000 Gesico":{tare:68,long:18,vl:100,cat:"S/C"},
+    "69000 PF3 DSDM":{tare:210,long:50,vl:100,cat:"S/C"},
+    "69000 + PF3 Gesico":{tare:142,long:30,vl:100,cat:"S/C"},
+    "69000 + U26":{tare:148,long:40,vl:100,cat:"S/C"},
+    "69000 HLP":{tare:68,long:20,vl:100,cat:"s/c"},
+    "69000 UM":{tare:136,long:40,vl:100,cat:"s/c"},
+    "7200 HLP":{tare:90,long:20,vl:100,cat:"S/c"},
+    "APMC":{tare:30,long:14,vl:80,cat:"A"},
+    "B108 275":{tare:86,long:32,vl:80,cat:"A"},
+    "B108 275 + canto":{tare:126,long:52,vl:80,cat:"A"},
+    "B108 32U Eiffage":{tare:88,long:34,vl:80,cat:"A"},
+    "B108 GS4":{tare:74,long:28,vl:80,cat:"A"},
+    "B108 GS4 + canto":{tare:111,long:48,vl:80,cat:"A"},
+    "B1-N eiffage":{tare:118,long:43,vl:80,cat:"A"},
+    "B2-N Eiffage":{tare:104,long:34,vl:80,cat:"A"},
+    "Bourreuse Delcourt":{tare:100,long:34,vl:80,cat:"A"},
+    "Bourreuse Bonobrini":{tare:112,long:36,vl:80,cat:"A"},
+    "EMV97 + canto":{tare:64,long:20,vl:60,cat:"A"},
+    "Dr 8144":{tare:55,long:20,vl:80,cat:"A"},
+    "Dr 8148":{tare:55,long:20,vl:80,cat:"A"},
+    "Dr 8148 + wagon":{tare:95,long:40,vl:80,cat:"A"},
+    "Dr 8154":{tare:55,long:20,vl:80,cat:"A"},
+    "Dr 8154 + wagon":{tare:95,long:40,vl:80,cat:"A"},
+    "Dr 9701":{tare:32,long:11,vl:80,cat:"A"},
+    "Dr 9701 + 1 Wg":{tare:72,long:31,vl:80,cat:"A"},
+    "Dr 9701 + 2 Wgets":{tare:52,long:30,vl:60,cat:"A"},
+    "Dr 9704":{tare:32,long:11,vl:80,cat:"A"},
+    "Dr 9704 + 1 Wg":{tare:72,long:31,vl:80,cat:"A"},
+    "Dr 9704 + 2 Wgets":{tare:42,long:20,vl:60,cat:"A"},
+  };
+
+  function autoFill(val) {
+    const d = MAT[val];
+    const ids = ['f-tare','f-longueur','f-vl','f-cat'];
+    if (d) {
+      document.getElementById('f-tare').value    = d.tare;
+      document.getElementById('f-longueur').value= d.long;
+      document.getElementById('f-vl').value      = d.vl;
+      document.getElementById('f-cat').value     = d.cat;
+      ids.forEach(id => document.getElementById(id).classList.add('auto-filled'));
+      document.getElementById('i-tare').textContent = d.tare + ' t';
+      document.getElementById('i-long').textContent = d.long + ' m';
+      document.getElementById('i-vl').textContent   = d.vl + ' km/h';
+      document.getElementById('i-cat').textContent  = d.cat;
+      document.getElementById('mat-info').classList.add('visible');
+    } else {
+      ids.forEach(id => { document.getElementById(id).value=''; document.getElementById(id).classList.remove('auto-filled'); });
+      document.getElementById('mat-info').classList.remove('visible');
+    }
+  }
+
+  // ═══════════════════════════
+  //  SOUMISSION → SUPABASE
+  // ═══════════════════════════
+  async function soumettre() {
+    const date      = document.getElementById('f-date').value;
+    const demandeur = document.getElementById('f-demandeur').value.trim();
+    const conducteur= document.getElementById('f-conducteur').value;
+    const materiel  = document.getElementById('f-materiel').value;
+    const parcours  = document.getElementById('f-parcours').value;
+
+    if (!date||!demandeur||!conducteur||!materiel||!parcours) {
+      alert('Veuillez remplir tous les champs obligatoires (*).'); return;
+    }
+
+    const btn = document.getElementById('btn-submit');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Envoi en cours...';
+
+    // Génération référence unique
+    const ref = 'SIL-' + new Date().getFullYear() + '-' + Date.now().toString().slice(-5);
+
+    // ── INSERT dans Supabase ──
+    const { data, error } = await db.from('demandes').insert({
+      user_id:        currentUser.id,
+      reference:      ref,
+      date_souhaitee: date,
+      demandeur,
+      conducteur,
+      materiel,
+      tare:           parseInt(document.getElementById('f-tare').value)    || null,
+      longueur:       parseInt(document.getElementById('f-longueur').value)|| null,
+      vl:             parseInt(document.getElementById('f-vl').value)      || null,
+      categorie:      document.getElementById('f-cat').value               || null,
+      parcours,
+      heure_depart:   document.getElementById('f-heure-dep').value         || null,
+      heure_arrivee:  document.getElementById('f-heure-arr').value         || null,
+      code_statut:    document.getElementById('f-code-statut').value       || null,
+      vds:            document.getElementById('f-vds').value               || null,
+      remarques:      document.getElementById('f-remarques').value         || null,
+    }).select();
+
+    btn.disabled = false;
+    btn.innerHTML = 'Envoyer la demande →';
+
+    if (error) {
+      alert('Erreur lors de l\'envoi : ' + error.message); return;
+    }
+
+    // ── Email admin (mailto fallback — à remplacer par EmailJS) ──
+    const subj = encodeURIComponent(`[Sillons] Nouvelle demande ${ref} — ${demandeur}`);
+    const body = encodeURIComponent(
+      `Bonjour James,\n\nNouvelle demande de sillon reçue :\n\n` +
+      `Référence : ${ref}\nDate : ${date}\nDemandeur : ${demandeur}\n` +
+      `Conducteur : ${conducteur}\nMatériel : ${materiel}\nParcours : ${parcours}\n` +
+      `Départ : ${document.getElementById('f-heure-dep').value||'—'}\n\n` +
+      `Consultez l'espace admin pour les détails.`
+    );
+    window.open(`mailto:${ADMIN_EMAIL}?subject=${subj}&body=${body}`);
+
+    document.getElementById('success-ref').textContent = 'Réf. : ' + ref;
+    document.getElementById('success-overlay').classList.add('show');
+  }
+
+  function nouvelleDemande() {
+    document.getElementById('success-overlay').classList.remove('show');
+    resetForm();
+  }
+
+  function resetForm() {
+    ['f-date','f-tare','f-longueur','f-vl','f-cat','f-heure-dep','f-heure-arr','f-vds','f-remarques']
+      .forEach(id => { const el=document.getElementById(id); if(el){el.value='';el.classList.remove('auto-filled');} });
+    ['f-conducteur','f-materiel','f-parcours','f-code-statut'].forEach(id => document.getElementById(id).selectedIndex=0);
+    document.getElementById('mat-info').classList.remove('visible');
+    document.getElementById('f-date').value = new Date().toISOString().split('T')[0];
+  }
+</script>
+</body>
+</html>
